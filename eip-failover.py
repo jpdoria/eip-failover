@@ -1,5 +1,6 @@
 import sys
 import boto3
+import json
 
 region = 'us-east-1'
 instances = ['i-xxxxxxxx', 'i-xxxxxxxx']
@@ -60,9 +61,9 @@ def check_eip(unhealthy_ec2):
 
 
 def main(event, context):
-    alarm = event['Records'][0]['Sns']['Message']['AlarmName']
-    state = event['Records'][0]['Sns']['Message']['NewStateValue']
-    unhealthy_ec2 = event['Records'][0]['Sns']['Message']['Trigger']['Dimensions'][0]['value']
+    alarm = json.loads(event['Records'][0]['Sns']['Message'])['AlarmName']
+    state = json.loads(event['Records'][0]['Sns']['Message'])['NewStateValue']
+    unhealthy_ec2 = json.loads(event['Records'][0]['Sns']['Message'])['Trigger']['Dimensions'][0]['value']
 
     print('Alarm:', alarm)
     print('State:', state)
