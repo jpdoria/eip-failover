@@ -1,98 +1,75 @@
-import boto3
 import sys
+import boto3
 
-is_ok = 'running'
 region = 'us-east-1'
-instances = ['i-12345678', 'i-87654321']
-eip = '51.23.123.123'
+instances = ['i-xxxxxxxx', 'i-xxxxxxxx']
+eip = '5x.xx.xxx.xxx'
 
 
-def failover(public_ip, instance):
+def failover(unhealthy_ec2):
     '''
-    Assign the EIP to another server after doing health checks
+    Remove the EIP from unhealthy instance then assign it to another server after doing health checks
     '''
     try:
-        ec2 = boto3.client('ec2', region_name=region)
-        describe_response = ec2.describe_addresses(
-            PublicIps=[
-                public_ip
-            ]
-        )
-        assoc_id = describe_response['Addresses'][0]['AssociationId']
+        instances.remove(unhealthy_ec2)
+        healthy_ec2 = instances[0]
+        ec2 = boto3.client('ec2', region_name=region) 
+
+        try:
+            describe_response = ec2.describe_addresses(
+                PublicIps=[
+                    eip
+                ]
+            )
+            assoc_id = describe_response['Addresses'][0]['AssociationId']
+        except:
+            print('CRITICAL: Elastic IP is not associated!!!')
+            sys.exit(1)
+
         disassociate_response = ec2.disassociate_address(
             AssociationId=assoc_id
         )
         disassociate_status_code = disassociate_response['ResponseMetadata']['HTTPStatusCode']
         alloc_id = describe_response['Addresses'][0]['AllocationId']
 
-        print('Disassociating {}...'.format(public_ip))
+        print('Disassociating {0} from {1}...'.format(eip, unhealthy_ec2))
 
         if disassociate_status_code == 200:
             associate_response = ec2.associate_address(
-                InstanceId=instance,
+                InstanceId=healthy_ec2,
                 AllocationId=alloc_id
             )
 
-            print('Associating {0} to {1}...'.format(public_ip, instance))
-
-            associate_status_code = associate_response['ResponseMetadata']['HTTPStatusCode']
-
-            if associate_status_code == 200:
-                return True
+            print('Associating {0} to {1}...'.format(eip, healthy_ec2))
+            return associate_response
+        else:
+            return disassociate_response
     except:
         raise
 
 
-def health_check():
+def check_eip(unhealthy_ec2):
     '''
-    Perform health checks
+    Check IP if it matches the Elastic IP before doing a failover
     '''
     try:
         ec2 = boto3.resource('ec2', region_name=region)
-        (a, b, c, d) = (None,)*4
+        public_ip = ec2.Instance(unhealthy_ec2).public_ip_address
 
-        for instance in instances:
-            print('Checking {}...'.format(instance))
-
-            state = ec2.Instance(instance).state
-            public_ip = ec2.Instance(instance).public_ip_address
-
-            if (state['Name'] == is_ok) and (public_ip == eip):
-                a = 'check_a'
-                print('{} is alive and it\'s using the Elastic IP!!!'.format(instance))
-
-            elif (state['Name'] == is_ok) and (public_ip != eip):
-                b = 'check_b'
-                print('{} is alive and it\'s not using the Elastic IP.'.format(instance))
-
-            elif (state['Name'] != is_ok) and (public_ip != eip):
-                c = 'check_c'
-                print('{} is dead and it\'s not using the Elastic IP.'.format(instance))
-
-            elif (state['Name'] != is_ok) and (public_ip == eip):
-                d = 'check_d'
-                print('{} is dead and it\'s using the Elastic IP!!!'.format(instance))
-
-        if (a and c):
-            print('WARNING: one proxy server is dead')
-            sys.exit(1)
-        elif (a and d):
-            print('Two instances using the same EIP?')
-            sys.exit(1)
-        elif (b and c) or (c and d):
-            print('CRITICAL: PROXY SERVERS ARE DEAD!!!')
-            sys.exit(2)
-        elif (b and d):
-            instances.remove(instance)
-            failover(public_ip, instances[0])
+        if public_ip == eip or public_ip != eip:
+            return failover(unhealthy_ec2)
+        else:
+            print('Nothing to do here.')
+            sys.exit(0)
     except:
         raise
 
 
 def main(event, context):
-    health_check()
+    alarm = event['Records'][0]['Sns']['Message']['AlarmName']
+    state = event['Records'][0]['Sns']['Message']['NewStateValue']
+    unhealthy_ec2 = event['Records'][0]['Sns']['Message']['Trigger']['Dimensions'][0]['value']
 
-    if True:
-        print('OK')
-    else:
-        raise
+    print('Alarm:', alarm)
+    print('State:', state)
+    print(check_eip(unhealthy_ec2))
