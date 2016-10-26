@@ -13,19 +13,13 @@ def failover(unhealthy_ec2):
     try:
         instances.remove(unhealthy_ec2)
         healthy_ec2 = instances[0]
-        ec2 = boto3.client('ec2', region_name=region) 
-
-        try:
-            describe_response = ec2.describe_addresses(
-                PublicIps=[
-                    eip
-                ]
-            )
-            assoc_id = describe_response['Addresses'][0]['AssociationId']
-        except:
-            print('CRITICAL: Elastic IP is not associated!!!')
-            sys.exit(1)
-
+        ec2 = boto3.client('ec2', region_name=region)
+        describe_response = ec2.describe_addresses(
+            PublicIps=[
+                eip
+            ]
+        )
+        assoc_id = describe_response['Addresses'][0]['AssociationId']
         disassociate_response = ec2.disassociate_address(
             AssociationId=assoc_id
         )
@@ -56,7 +50,7 @@ def check_eip(unhealthy_ec2):
         ec2 = boto3.resource('ec2', region_name=region)
         public_ip = ec2.Instance(unhealthy_ec2).public_ip_address
 
-        if public_ip == eip or public_ip != eip:
+        if public_ip == eip:
             return failover(unhealthy_ec2)
         else:
             print('Nothing to do here.')
