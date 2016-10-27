@@ -9,3 +9,6 @@ The client has two proxy instances that are not using Auto Scaling and they need
 * 1 Proxy instance (secondary)
 * 1 SNS topic for CloudWatch Alarms
 * 2 CloudWatch alarms (CPUUtilization > 65%) for these instances
+
+# Diagram
+![aws-eip-failover-diagram](https://cdn.lazyadm.in/eip-failover.png)
