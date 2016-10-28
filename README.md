@@ -1,4 +1,9 @@
 # About
+
+[![forthebadge](http://forthebadge.com/images/badges/built-with-love.svg)](http://forthebadge.com)
+[![forthebadge](http://forthebadge.com/images/badges/powered-by-oxygen.svg)](http://forthebadge.com)
+[![forthebadge](http://forthebadge.com/images/badges/fuck-it-ship-it.svg)](http://forthebadge.com)
+
 A basic AWS Lambda function, when triggered by SNS if CPU utilization is >= 65%, automatically disassociates Elastic IP from unhealthy EC2 instance, then associates it to a healthy EC2 instance.
 
 # Use Case
